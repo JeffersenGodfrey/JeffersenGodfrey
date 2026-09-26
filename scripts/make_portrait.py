@@ -41,7 +41,13 @@ COLS = 90                  # below ~88 the face muddies; far above it dominates
 CLAHE_CLIP = 3.0           # higher amplifies skin texture into noise
 GAMMA = 1.0                # ramp mapping exponent
 CURVE = 1.7                # the darkening curve — the difference-maker
+ALPHA_MIN = 8              # rembg cutout floor — only near-fully-transparent
+                           # pixels are lifted to paper white, so dark but
+                           # opaque shirt/neck rows are never stripped out
 CROP_BOTTOM = 0.0          # fraction to trim off the bottom (torso, chair)
+                           # keep at 0.0 — bottom rows are part of the portrait
+BOTTOM_PAD = 6             # extra SVG breathing room below the last row so
+                           # descenders and the final wipe are never clipped
 ROW_RATIO = 0.48           # monospace cells are about twice as tall as wide
 
 FG_LIGHT = "#0077b5"       # LinkedIn blue — the accent, on GitHub light
@@ -94,7 +100,7 @@ def prep(path, crop=None, model=None):
     gray = cv2.createCLAHE(clipLimit=CLAHE_CLIP,
                            tileGridSize=(8, 8)).apply(gray)
     gray = (255.0 * (gray / 255.0) ** CURVE).astype("uint8")
-    gray[alpha < 20] = 255                            # force the matte to white
+    gray[alpha < ALPHA_MIN] = 255  # only near-transparent matte -> white                            # force the matte to white
     return Image.fromarray(gray)
 
 
@@ -126,7 +132,7 @@ def to_lines(img, cols=COLS, gamma=GAMMA):
 def build_svg(lines, cols=COLS):
     pad = 14
     width = int(cols * CHAR_W + pad * 2)
-    height = len(lines) * LINE_H + pad * 2
+    height = len(lines) * LINE_H + pad * 2 + BOTTOM_PAD
 
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
          f'height="{height}" viewBox="0 0 {width} {height}" '
