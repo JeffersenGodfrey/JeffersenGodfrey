@@ -38,7 +38,7 @@
 
 ## ✍️ Dev Quote
 
-> "Software engineering is the part of computer science which is too difficult for the computer scientist."
+> "Talk is cheap. Show me the code."
 >
-> — *Friedrich Bauer*
+> — *Linus Torvalds*
 

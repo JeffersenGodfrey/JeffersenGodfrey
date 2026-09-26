@@ -66,8 +66,8 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
 # off-white #e2e8f0 is the dark-mode text step.
 LIGHT = dict(data="#0077b5", emph="#0f172a", dim="#64748b",
              rule="#cbd5e1", surface="#ffffff")
-DARK = dict(data="#38bdf8", emph="#e2e8f0", dim="#94a3b8",
-            rule="#334155", surface="#0d1117")
+DARK = dict(data="#38bdf8", emph="#e2e8f0", dim="#8b949e",
+            rule="#30363d", surface="#0d1117")
 # JBMono is the inlined subset below; the rest is a fallback for the unlikely
 # case a renderer ignores the embedded face.
 MONO = ("JBMono,ui-monospace,SFMono-Regular,Menlo,Consolas,"
@@ -173,15 +173,23 @@ def streaks(days):
     return cur, best
 
 
+# Canonical aliases for verbose language names to prevent clipping and keep alignment
+LANG_ALIASES = {
+    "Jupyter Notebook": "Jupyter",
+}
+
+
 def languages(repos):
     by_size, by_repo = {}, {}
     for node in repos:
         edges = (node.get("languages") or {}).get("edges") or []
         for e in edges:
-            name = e["node"]["name"]
+            raw_name = e["node"]["name"]
+            name = LANG_ALIASES.get(raw_name, raw_name)
             by_size[name] = by_size.get(name, 0) + e["size"]
         if edges:                       # primary language of the repo
-            top = edges[0]["node"]["name"]
+            raw_top = edges[0]["node"]["name"]
+            top = LANG_ALIASES.get(raw_top, raw_top)
             by_repo[top] = by_repo.get(top, 0) + 1
 
     def rank(d):
@@ -350,8 +358,9 @@ def draw_langs(s):
         for ri, (name, val) in enumerate(data):
             y = 26 + ri * 22
             shown = (f"{val / total * 100:.0f}%" if as_pct else f"{val}")
+            clean_name = LANG_ALIASES.get(name, name)
             p.append(f'<g opacity="0">{fade(0.24 + gi * 0.10 + ri * 0.05)}'
-                     + label(gx, y + 8, name.lower()[:11], 11, "e-f")
+                     + label(gx, y + 8, clean_name.lower()[:11], 11, "e-f")
                      + label(gx + colw - 6, y + 8, shown, 11, "m-f", "end")
                      + '</g>')
             p.append(f'<g clip-path="url(#{cid})">'
