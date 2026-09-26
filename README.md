@@ -6,9 +6,13 @@
   Palette: #0077B5 accent on light, #38BDF8 accent on dark, #E2E8F0 dark-mode text.
 -->
 
+<div align="center">
+
 <picture>
-  <img src="./portrait.svg" alt="ASCII Portrait" width="100%">
+  <img src="./portrait.svg" alt="ASCII Portrait" width="460">
 </picture>
+
+</div>
 
 ## Socials
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/jeffersen-godfrey-924077293)
@@ -24,18 +28,22 @@
 ---
 
 ## GitHub Activity
+<div align="center">
+
 <picture>
-  <img src="./stats.svg" alt="GitHub Stats" width="100%">
+  <img src="./stats.svg" alt="GitHub Stats" width="600">
 </picture>
 <picture>
-  <img src="./streak.svg" alt="GitHub Streak" width="100%">
+  <img src="./streak.svg" alt="GitHub Streak" width="600">
 </picture>
 <picture>
-  <img src="./langs.svg" alt="Languages" width="100%">
+  <img src="./langs.svg" alt="Languages" width="600">
 </picture>
 <picture>
-  <img src="./year.svg" alt="Yearly Activity" width="100%">
+  <img src="./year.svg" alt="Yearly Activity" width="600">
 </picture>
+
+</div>
 
 ---
 
