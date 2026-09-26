@@ -49,6 +49,10 @@ CROP_BOTTOM = 0.0          # fraction to trim off the bottom (torso, chair)
 BOTTOM_PAD = 6             # extra SVG breathing room below the last row so
                            # descenders and the final wipe are never clipped
 ROW_RATIO = 0.48           # monospace cells are about twice as tall as wide
+CURVE_LOW = 1.35           # gentler curve for the lower third (neck/shirt)
+KEEP_LOWER_FRAC = 0.30     # bottom fraction where rembg is bypassed
+FADE_FRAC = 0.15           # bottom fraction faded linearly to paper
+MIN_ROWS = 60              # floor on vertical rows; pad if the crop is short
 
 FG_LIGHT = "#0077b5"       # LinkedIn blue — the accent, on GitHub light
 FG_DARK = "#38bdf8"        # bright cyan — its dark-mode step, on #0d1117
@@ -89,6 +93,7 @@ def prep(path, crop=None, model=None):
 
     session = new_session(model) if model else None
     cut = remove(src, session=session)
+    kept = np.array(src.convert("L"))
     alpha = np.array(cut.split()[-1])
 
     # Composite onto white so everything outside the subject maps to the blank
@@ -96,11 +101,39 @@ def prep(path, crop=None, model=None):
     white = Image.new("RGBA", cut.size, (255, 255, 255, 255))
     gray = np.array(Image.alpha_composite(white, cut).convert("L"))
 
+    # Combine rembg's mask with the original frame: bypass the cutout on the
+    # lower KEEP_LOWER_FRAC so dark shirt/neck pixels are never read as
+    # background noise and stripped to transparent/white. Anchor rows come
+    # from the original photo; only the upper region trusts rembg.
+    h0, w0 = kept.shape[0], kept.shape[1]
+    keep_y = int(h0 * (1.0 - KEEP_LOWER_FRAC))
+    gray[keep_y:h0, :w0] = kept[keep_y:h0, :w0]
+
     gray = cv2.bilateralFilter(gray, 11, 50, 50)      # smooth skin, keep edges
     gray = cv2.createCLAHE(clipLimit=CLAHE_CLIP,
                            tileGridSize=(8, 8)).apply(gray)
-    gray = (255.0 * (gray / 255.0) ** CURVE).astype("uint8")
-    gray[alpha < ALPHA_MIN] = 255  # only near-transparent matte -> white                            # force the matte to white
+
+    # Darkening curve: harsh CURVE up top for feature definition, gentler
+    # CURVE_LOW across the lower third so dark neck/shirt pixels map to
+    # low-ramp texture (`.`, `:`, `-`) instead of crushing or washing out.
+    norm = gray.astype(np.float32) / 255.0
+    low_y = h0 - h0 // 3
+    gray = np.vstack([255.0 * np.power(norm[:low_y], CURVE),
+                      255.0 * np.power(norm[low_y:], CURVE_LOW)]).astype("uint8")
+
+    # Only near-transparent matte goes to white outside the kept band; the
+    # lower band stays anchored to the photo even if rembg flagged it.
+    outside = np.ones_like(alpha, dtype=bool)
+    outside[keep_y:h0, :] = False
+    gray[outside & (alpha < ALPHA_MIN)] = 255
+
+    # Feathered fade across the bottom FADE_FRAC: chest/shoulders dissolve
+    # into paper naturally instead of stopping on a hard truncated edge.
+    fade_n = max(int(h0 * FADE_FRAC), 1)
+    fade = np.linspace(0.0, 1.0, fade_n, dtype=np.float32)[:, None]
+    fade = np.broadcast_to(fade, (fade_n, w0))
+    tail = gray[h0 - fade_n:h0, :].astype(np.float32)
+    gray[h0 - fade_n:h0, :] = (tail * fade + 255.0 * (1.0 - fade)).astype("uint8")
     return Image.fromarray(gray)
 
 
@@ -110,7 +143,7 @@ def to_lines(img, cols=COLS, gamma=GAMMA):
         img = img.crop((0, 0, w, int(h * (1 - CROP_BOTTOM))))
         w, h = img.size
 
-    rows = int(cols * (h / w) * ROW_RATIO)
+    rows = max(int(cols * (h / w) * ROW_RATIO), MIN_ROWS)
     img = img.resize((cols, rows), Image.LANCZOS)
     px = list(img.getdata())
     n = len(RAMP)
