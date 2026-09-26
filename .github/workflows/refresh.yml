@@ -1,0 +1,91 @@
+name: refresh profile graphics
+
+# Deliberately no `push` trigger on the SVGs: this job commits them, so a plain
+# push trigger would make it re-run on its own commit. The `paths` filter below
+# is the one exception, and it is there for convenience — changing the generator
+# or the palette is exactly the moment you want the graphics redrawn and
+# committed for you. It cannot loop: commits made with GITHUB_TOKEN do not
+# trigger workflow runs, and the bot commit touches only SVGs.
+on:
+  schedule:
+    - cron: "17 5 * * *"      # 05:17 UTC, every day
+  workflow_dispatch:
+    inputs:
+      login:
+        description: "GitHub login to summarise (default: repo owner)"
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/refresh.yml"
+      - "scripts/generate_stats.py"
+      - "scripts/fonts/**"
+
+# Needed by the commit step; everything else is read-only.
+permissions:
+  contents: write
+
+# One refresh at a time, and never cancel a run that is mid-commit.
+concurrency:
+  group: refresh-stats
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Draw the stat graphics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_LOGIN: ${{ inputs.login || github.repository_owner }}
+        run: python3 scripts/generate_stats.py
+
+      - name: Commit whatever changed
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Every graphic this repository generates. portrait.svg is drawn once
+          # by hand (scripts/make_portrait.py — it needs a photo); listing it
+          # here just means a manual rebuild is picked up by the next run. The
+          # loop keeps only the files that actually exist, because git rejects a
+          # pathspec that matches nothing.
+          FILES=""
+          for f in stats.svg streak.svg langs.svg year.svg hd-*.svg portrait.svg; do
+            if [ -f "$f" ]; then FILES="$FILES $f"; fi
+          done
+          if [ -z "${FILES// /}" ]; then
+            echo "no generated graphics found"
+            exit 0
+          fi
+
+          # Unquoted on purpose: $FILES is a list and must word-split.
+          if [ -z "$(git status --porcelain -- $FILES)" ]; then
+            echo "no change"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- $FILES
+          git commit -m "stats: refresh profile graphics"
+
+          # A push that landed while the graphics were being drawn is what makes
+          # a bare `git push` die with a non-fast-forward. Rebase this one bot
+          # commit on top of it; if even that conflicts — someone edited a
+          # generated SVG by hand — abort and merge preferring ours, because the
+          # copy we just drew is the newer truth.
+          git fetch origin "$BRANCH"
+          if git rebase "origin/$BRANCH"; then
+            echo "rebased onto origin/$BRANCH"
+          else
+            echo "rebase conflicted; keeping the freshly drawn graphics"
+            git rebase --abort || true
+            git merge --no-edit -X ours "origin/$BRANCH"
+          fi
+          git push origin "HEAD:$BRANCH"

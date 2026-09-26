@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+
+# Source photo for scripts/make_portrait.py. Drop it in the repo root and it
+# stays local: only the generated portrait.svg is ever committed.
+/photo.*
+/*.jpg
+/*.jpeg
+/*.png
+/*.webp
+/*.heic
+

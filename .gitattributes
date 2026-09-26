@@ -1,0 +1,9 @@
+# The SVGs are generated and byte-compared ("commit only what changed"), so
+# their line endings must not depend on the machine that drew them: LF always.
+# Without this, a Windows checkout with core.autocrlf=true commits CRLF, the
+# Linux runner writes LF, and every nightly run looks like a change.
+*.svg text eol=lf
+*.py  text eol=lf
+
+# Inlined into the SVGs as base64 — any newline rewriting would corrupt them.
+*.woff2 binary
